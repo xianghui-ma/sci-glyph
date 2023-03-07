@@ -1,0 +1,30 @@
+{
+  "name": "sci-glyph",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "rollup -c"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xianghui-ma/sci-glyph.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/xianghui-ma/sci-glyph/issues"
+  },
+  "homepage": "https://github.com/xianghui-ma/sci-glyph#readme",
+  "devDependencies": {
+    "@babel/core": "^7.21.0",
+    "@babel/preset-env": "^7.20.2",
+    "rollup": "^2.79.1",
+    "rollup-plugin-babel": "^4.4.0"
+  },
+  "dependencies": {
+    "d3": "^7.8.2"
+  }
+}
