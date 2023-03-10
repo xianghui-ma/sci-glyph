@@ -1,7 +1,7 @@
 /*
  * @Author: Dongliang Ma
  * @Date: 2023-03-07 13:19:59
- * @LastEditTime: 2023-03-09 10:13:42
+ * @LastEditTime: 2023-03-10 14:28:36
  * @LastEditors: Dongliang Ma
  * @Description: 一个常用的可视化论文图标库
  * @GitHub: https://github.com/xianghui-ma
@@ -9,6 +9,13 @@
  */
 
 import * as d3 from 'd3';
+import {
+    getCanvasMes,
+    getRingPath,
+    getRadialArea,
+    getCircle,
+    getTriangle
+} from './primitive.js';
 
 /*
     * container是D3 SVG画布实例;
@@ -26,16 +33,12 @@ import * as d3 from 'd3';
         axisFontSize: '12px' //标记文本字体大小
     }
 */
-export const radialAreaGlyph = (container, config)=>{
+export const radialAreaGlyph = (canvas, config)=>{
     /********** 参数准备 **********/
-    // 获取画布尺寸
-    let containerWidth = container.attr('width');
-    let containerHeight = container.attr('height');
-    // 获取画布中心坐标
-    let centerX = containerWidth / 2;
-    let centerY = containerHeight / 2;
+    // 获取画布尺寸信息
+    let {canvasWidth, canvasHeight, centerX, centerY} = getCanvasMes(canvas);
     // 计算外圆半径
-    let outterRadius = containerWidth < containerHeight ? containerWidth / 2 : containerHeight / 2;
+    let outterRadius = canvasWidth < canvasHeight ? canvasWidth / 2 : canvasHeight / 2;
     // 设置比例尺
     let histogramScale = d3.scaleLinear()
         .domain([0, d3.max(config.histogramData)])
@@ -44,16 +47,12 @@ export const radialAreaGlyph = (container, config)=>{
         .domain([0, d3.max(config.radialAreaData)])
         .range([config.innerRadius, config.middleRadius]);
     // 添加组合容器g
-    let elementsCollection = container.append('g');
+    let elementsCollection = canvas.append('g');
 
     /********** 开始绘制 **********/
     /***** 绘制圆环 *****/
     // 路径生成
-    let arcPath = d3.arc()
-        .innerRadius(config.innerRadius)
-        .outerRadius(config.middleRadius)
-        .startAngle(0)
-        .endAngle(2 * Math.PI);
+    let arcPath = getRingPath(config.innerRadius, config.middleRadius, 0, 2 * Math.PI);
     // 绘制路径
     elementsCollection.append('g')
         .attr('transform', `translate(${centerX}, ${centerY})`)
@@ -67,12 +66,7 @@ export const radialAreaGlyph = (container, config)=>{
     // 创建路径
     config.histogramData.forEach((item, index)=>{
         arcPathArr.push(
-            d3.arc()
-                .innerRadius(config.middleRadius)
-                .outerRadius(histogramScale(item))
-                .startAngle((index * 15) * (Math.PI / 180))
-                .endAngle((index * 15 + 15) * (Math.PI / 180))
-                .padAngle(0.02)
+            getRingPath(config.middleRadius, histogramScale(item), (index * 15) * (Math.PI / 180), (index * 15 + 15) * (Math.PI / 180)).padAngle(0.02)
         );
     });
     // 绘制路径
@@ -89,11 +83,9 @@ export const radialAreaGlyph = (container, config)=>{
     // 平分角度
     let angles = d3.range(0, 2 * Math.PI, Math.PI / 48);
     // 创建径向面积生成器
-    let area = d3.areaRadial()
-        .curve(d3.curveLinearClosed)
-        .angle((d) => { return d })
-        .innerRadius(config.innerRadius)
-        .outerRadius((_, i) => { return radialAreaScale(config.radialAreaData[i])});
+    let area = getRadialArea(config.innerRadius, (_, i) => {
+        return radialAreaScale(config.radialAreaData[i]);
+    });
     // 绘制区域
     elementsCollection.append('g')
         .attr('transform', `translate(${centerX}, ${centerY})`)
@@ -130,13 +122,158 @@ export const radialAreaGlyph = (container, config)=>{
         .attr('color', '#aaa')
         .text(config.centerText);
     /***** 绘制平均线 *****/
-    elementsCollection.append('g')
-        .append('circle')
-        .attr("cx", centerX)
-        .attr("cy", centerY)
-        .attr("r", radialAreaScale(d3.mean(config.radialAreaData)))
+    getCircle(elementsCollection.append('g'), centerX, centerY, radialAreaScale(d3.mean(config.radialAreaData)))
         .attr('stroke', config.themeStyle)
         .attr('stroke-width', '2px')
         .attr("stroke-dasharray", 8 + " " + 4)
         .attr("fill", "none");
+}
+
+/*
+    * container是D3 SVG画布实例;
+    * config是配置对象,配置项及含义如下:
+    {
+        smallCircleSize: [11,8,45,21,2,34,79,50,25,0], //小圆尺寸
+        pointerMax: 56.0204081632653, //指针最大值
+        pointerMean: 26.506147994187383, //指针平均值
+        innerArcMax: 100, //内圆弧最大值
+        innerArcMean: 58, //内圆弧平均值
+        upperArcMax: 100, //上圆弧最大值
+        upperArcMean: 60, //上圆弧平均值
+        lowerArcMax: 100, //下圆弧最大值
+        lowerArcMean: 45, //下圆弧平均值
+        centerRadius: 15, //中心圆半径
+        outerRadius: 50, //外圆半径
+        themeStyle: '', //主题颜色
+        pointerFontSize: '16px', //指针字体大小
+    }
+*/
+export const instrumentPanelGlyph = (canvas, config)=>{
+    /********** 参数准备 **********/
+    // 获取画布尺寸信息
+    let {canvasWidth, canvasHeight, centerX, centerY} = getCanvasMes(canvas);
+    // 添加组合容器g
+    let elementsCollection = canvas.append('g');
+    // 定义比例尺
+    let pointerRotateScale = d3.scaleLinear()
+        .domain([0, config.pointerMax])
+        .range([60, 300]);
+    let colorScale = d3.scaleLinear()
+        .domain([0, config.pointerMax])
+        .range(['#D3D4D5', config.themeStyle]);
+    let sizeScale = d3.scaleLinear()
+        .domain([0, d3.max(config.smallCircleSize)])
+        .range([1, 9]);
+    let innerArcScale = d3.scaleLinear()
+        .domain([0, config.innerArcMax])
+        .range([225, 135]);
+    let upperArcScale = d3.scaleLinear()
+        .domain([0, config.upperArcMax])
+        .range([-45, 45]);
+    let lowerArcScale = d3.scaleLinear()
+        .domain([0, config.lowerArcMax])
+        .range([-45, -135]);
+
+    /********** 开始绘制 **********/
+    // 绘制外圆
+    getCircle(elementsCollection.append('g'), centerX, centerY, config.outerRadius)
+        .attr('stroke', config.themeStyle)
+        .attr('stroke-width', '2px')
+        .attr("fill", "none");
+    // 绘制圆心
+    getCircle(elementsCollection.append('g'), centerX, centerY, config.centerRadius)
+        .attr("fill", config.themeStyle);
+    // 绘制指针
+    getTriangle(
+        elementsCollection.append('g').attr('transform', `translate(${centerX}, ${centerY})`),
+        config.pointerCoord,
+        pointerRotateScale(config.pointerMean)
+    ).attr('fill', config.themeStyle)
+    // 绘制指针表盘
+    let arcPathArr = [];
+    for (let i = 1; i <= 12; i++){
+        arcPathArr.push(
+            getRingPath(config.outerRadius - 20, config.outerRadius - 4, (20 * i - 140) * (Math.PI / 180), ((20 * i - 140) + 18) * (Math.PI / 180))
+        );
+    }
+    elementsCollection.append('g')
+        .attr('transform', `translate(${centerX}, ${centerY})`)
+        .selectAll('path')
+        .data(arcPathArr)
+        .join('path')
+        .attr('d', (d)=>{
+            return d();
+        })
+        .attr('fill', (_, i)=>{
+            return(colorScale((config.pointerMax / 12) * i))
+        });
+    // 绘制小圆
+    let smallCircleG = elementsCollection.append('g')
+        .attr('transform', `translate(${centerX}, ${centerY})`);
+    config.smallCircleSize.forEach((item, index)=>{
+        smallCircleG.append('g')
+        .attr('transform', `rotate(${-130 + index * 15}) translate(0, ${config.outerRadius + 9})`)
+        .append('circle')
+        .attr('r', ()=>{
+            return sizeScale(item);
+        })
+        .attr('fill', config.themeStyle);
+    });
+    // 绘制内圆弧
+    let arcTotal = getRingPath(config.outerRadius - 18, config.outerRadius, 135 * (Math.PI / 180), 225 * (Math.PI / 180));
+    elementsCollection.append('g')
+        .attr('transform', `translate(${centerX}, ${centerY})`)
+        .append('path')
+        .attr('d', arcTotal)
+        .attr('stroke', config.themeStyle)
+        .attr('stroke-width', '2px')
+        .attr('fill', 'none');
+    // 绘制碳排放占比
+    let arcCO2 = getRingPath(config.outerRadius - 18, config.outerRadius, 225 * (Math.PI / 180), innerArcScale(config.innerArcMean) * (Math.PI / 180));
+    elementsCollection.append('g')
+        .attr('transform', `translate(${centerX}, ${centerY})`)
+        .append('path')
+        .attr('d', arcCO2)
+        .attr('stroke', config.themeStyle)
+        .attr('stroke-width', '2px')
+        .attr('fill', config.themeStyle);
+    // 绘制上圆弧
+    let upperArc = getRingPath(config.outerRadius, config.outerRadius + 18, -45 * (Math.PI / 180), upperArcScale(config.upperArcMean) * (Math.PI / 180));
+    elementsCollection.append('g')
+        .attr('transform', `translate(${centerX}, ${centerY})`)
+        .append('path')
+        .attr('d', upperArc)
+        .attr('stroke', '#C1C2C4')
+        .attr('stroke-width', '2px')
+        .attr('fill', config.themeStyle);
+    // 绘制下圆弧
+    let lowerArc = getRingPath(config.outerRadius, config.outerRadius + 18, -45 * (Math.PI / 180), lowerArcScale(config.innerArcMean) * (Math.PI / 180));
+    elementsCollection.append('g')
+        .attr('transform', `translate(${centerX}, ${centerY})`)
+        .append('path')
+        .attr('d', lowerArc)
+        .attr('stroke', '#C1C2C4')
+        .attr('stroke-width', '2px')
+        .attr('fill', config.themeStyle);
+    // 绘制速度说明文字
+    elementsCollection.append('g')
+        .attr('transform', `translate(${centerX}, ${centerY})`)
+        .append('g')
+        .append('text')
+        .attr('transform', `rotate(${60}) translate(0, ${config.outerRadius - 22})`)
+        .attr("text-anchor", "middle")
+        .attr('font-size', config.pointerFontSize)
+        .attr('font-weight', 600)
+        .attr('fill', '#bbb')
+        .text(0);
+    elementsCollection.append('g')
+        .attr('transform', `translate(${centerX}, ${centerY})`)
+        .append('g')
+        .append('text')
+        .attr('transform', `rotate(${-60}) translate(0, ${config.outerRadius - 22})`)
+        .attr("text-anchor", "middle")
+        .attr('font-size', config.pointerFontSize)
+        .attr('font-weight', 600)
+        .attr('fill', '#bbb')
+        .text(config.pointerMax);
 }
