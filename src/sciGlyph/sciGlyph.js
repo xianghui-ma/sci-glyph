@@ -1,13 +1,3 @@
-/*
- * @Author: Dongliang Ma
- * @Date: 2023-03-07 13:19:59
- * @LastEditTime: 2023-03-10 14:28:36
- * @LastEditors: Dongliang Ma
- * @Description: 一个常用的可视化论文图标库
- * @GitHub: https://github.com/xianghui-ma
- * @Email: ma_dong_liang@163.com
- */
-
 import * as d3 from 'd3';
 import {
     getCanvasMes,
@@ -276,4 +266,126 @@ export const instrumentPanelGlyph = (canvas, config)=>{
         .attr('font-weight', 600)
         .attr('fill', '#bbb')
         .text(config.pointerMax);
+}
+/*
+    * container是D3 SVG画布实例;
+    * config是配置对象,配置项及含义如下:
+    {
+        smallCircleSize: [11,8,45,21,2,34,79,50,25], //小圆数据
+        outerRadius: 80, //外圆半径
+        innerRadius: 30, //内圆半径
+        outerArcData: [100, 50, 120, 98, 60, 21, 78, 55, 90, 200], //外圆弧数据
+        innerArcData: [100, 50, 79, 20, 30], //内圆弧数据
+        points: [...], //地图坐标点数据
+        chinaMap: null, //地图geojson数据
+        colors: ['#C54E83', '#4EBABC', '#F4A2B9', '#8FC1D9', '#FFC599'], //五种类型颜色
+        smallCircleMarkColors: ['red', '#ccc', 'blue', '#ccc', '#ccc', '#ccc', '#ccc', '#ccc', '#ccc'], //小圆标记颜色
+        themeStyle: 'blue', //主题颜色
+        mapScale: 0.4, //地图缩放因子
+        innerArcWidth: 10,
+        pointsColors: {'HH': '#C54E83'}, //点的颜色
+        pointR: 2 //点的半径
+    }
+*/
+export const spatialDistribution = (canvas, config)=>{
+    /********** 参数准备 **********/
+    // 获取画布尺寸信息
+    let {canvasWidth, canvasHeight, centerX, centerY} = getCanvasMes(canvas);
+    // 添加组合容器g
+    let elementsCollection = canvas.append('g');
+    // 定义比例尺
+    let outerArcScale = d3.scaleLinear()
+        .domain([0, d3.max(config.outerArcData)])
+        .range([config.innerRadius, config.outerRadius]);
+    let innerArcScale = d3.scaleLinear()
+        .domain([0, d3.max(config.innerArcData)])
+        .range([0, 50]);
+    let sizeScale = d3.scaleLinear()
+        .domain([0, d3.max(config.smallCircleSize)])
+        .range([0, 5]);
+
+    /********** 开始绘制 **********/
+    // 绘制外圆弧
+    // 路径数组
+    let arcPathArr = [];
+    // 创建路径
+    config.outerArcData.forEach((item, index)=>{
+        arcPathArr.push(
+            getRingPath(config.innerRadius, outerArcScale(item), (index * 36) * (Math.PI / 180), (index * 36 + 36) * (Math.PI / 180))
+        );
+    });
+    // 绘制路径
+    elementsCollection.append('g')
+        .attr('transform', `translate(${centerX}, ${centerY})`)
+        .selectAll('path')
+        .data(arcPathArr)
+        .join('path')
+        .attr('d', (d)=>{
+            return d();
+        })
+        .attr('fill', config.themeStyle)
+        .style('stroke', '#fff');
+    // 绘制内圆弧
+    let angleCount = 0;
+    // 路径数组
+    arcPathArr = []
+    // 创建路径
+    config.innerArcData.forEach((item, _)=>{
+        arcPathArr.push(
+            getRingPath(config.innerRadius - config.innerArcWidth, config.innerRadius, angleCount * (Math.PI / 180), (angleCount + innerArcScale(item)) * (Math.PI / 180))
+        );
+        angleCount += innerArcScale(item);
+    });
+    // 绘制路径
+    elementsCollection.append('g')
+        .attr('transform', `translate(${centerX}, ${centerY})`)
+        .selectAll('path')
+        .data(arcPathArr)
+        .join('path')
+        .attr('d', (d)=>{
+            return d();
+        })
+        .attr('fill', (_, i)=>{
+            return config.colors[i];
+        });
+    // 绘制小圆
+    let smallCircleG = elementsCollection.append('g')
+        .attr('transform', `translate(${centerX}, ${centerY})`);
+    config.smallCircleSize.forEach((item, index)=>{
+        smallCircleG.append('g')
+            .attr('transform', `rotate(${20 + index * 15}) translate(0, ${config.innerRadius - 5})`)
+            .append('circle')
+            .attr('r', ()=>{
+                return sizeScale(item);
+            })
+            .attr('fill', config.smallCircleMarkColors[index]);
+    });
+    // 绘制地图
+    let projection = d3.geoMercator()
+        .center([107, 31])
+        .scale(config.mapScale)
+        .translate([centerX * 1.05, centerY * 1.1]);
+    let path = d3.geoPath()
+        .projection(projection);
+    let mapContainer = elementsCollection.append('g');
+    mapContainer.selectAll('path')
+        .data(config.chinaMap.features)
+        .enter()
+        .append('path')
+        .style('fill', '#eee')
+        .attr('d', path);
+    // 绘制地图上的点
+    let locSvg = mapContainer.selectAll('location')
+        .data(config.points)
+        .enter()
+        .append('g')
+        .attr('transform', (d)=>{
+            let coor = projection([d.lon, d.lat]);
+            return `translate(${coor[0]}, ${coor[1]})`;
+        });
+    locSvg.append('circle')
+        .attr('r', config.pointR)
+        .attr('fill', (d, i)=>{
+            return config.pointsColors[d.class];
+        });
 }
