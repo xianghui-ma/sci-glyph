@@ -10,13 +10,13 @@
 ### 用法
 ***
 
-首先下载npm包：
+**Step1:** 首先下载npm包：
 `npm i sci-glyph`
 
-引入方法：
+**Step2:** 引入方法：
 `import {instrumentPanelGlyph, radialAreaGlyph, spatialDistribution} from 'sci-glyph'`
 
-每个方法调用需要传入两个参数：
+**Step3:** 每个方法调用需要传入两个参数：
 - `canvas`**D3**画布实例。
 - `option`图形的配置项对象。每个图形的配置项如下面所述。
 
