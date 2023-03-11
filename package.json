@@ -14,7 +14,7 @@
     "type": "git",
     "url": "git+https://github.com/xianghui-ma/sci-glyph.git"
   },
-  "keywords": [],
+  "keywords": ["visualization", "d3.js"],
   "author": "",
   "license": "ISC",
   "bugs": {
